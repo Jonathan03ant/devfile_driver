@@ -15,25 +15,35 @@
  * the file instance is created after the device file is opned.
  */
 
-static int devfile_open ( struct inode *dev_file, struct file *opened_instance ) {
+
+static struct file_operation fops = {
+	.owner = THIS_MODULE, 
+	.open = devFileOpen,
+	.release = devFileRelease
+};
+
+static int defFileOpen (struct inode *deviceFile, struct file *instance){
+	printk("device driver -- open was called");
+	return 0;
 
 };
 
 
-static int devfile_close (struct inode *devfile, struct file *instance){
+static int defFileRelease ( truct inode *deviceFile, struct file * instance){
+	printk("device driver -- close was called\n");
+	return 0;
 };
 
 
 
+static int __init moduleInit(void){
+	/*
+	 * Here is when we will initialize the device file with minor and major no
+	 * registering the dev file with major and minor numbers
+	 */
 
+};
 
-
-
-
-
-
-
-static int __init moduleInit(void){};
 static void __exit moduleExit(void){};
 
 
