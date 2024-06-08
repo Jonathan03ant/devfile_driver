@@ -2,87 +2,51 @@
 #include <linux/init.h>
 #include <linux/fs.h>
 
-
-# define MYMAJOR 19; //This number is defined for the device file's major number when we register it
-
-
-
-/*
- 	*@NOTE 
- * When a user application calls open on a device file, the kernel will forward the call to this function.
- * inode dev_file is needed for the actual driver to determine permission, check major and minor number etc
- * the file instance is created after the device file is opned.
- */
-
+#define MYMAJOR 19
 
 static int devFileOpen(struct inode *deviceFile, struct file *instance){
-	printk("device driver -- open was called");
-	return 0;
-
+    printk(KERN_INFO "device driver -- open was called\n");
+    return 0;
 };
 
-
-static int devFileRelease (struct inode *deviceFile, struct file *instance){
-	printk("device driver -- close was called\n");
-	return 0;
+static int devFileRelease(struct inode *deviceFile, struct file *instance){
+    printk(KERN_INFO "device driver -- close was called\n");
+    return 0;
 };
 
 static struct file_operations fops = {
-        .owner = THIS_MODULE,
-        .open = devFileOpen,
-        .release = devFileRelease
+   .owner = THIS_MODULE,
+   .open = devFileOpen,
+   .release = devFileRelease
 };
 
+static void __exit moduleStop(void){
+    unregister_chrdev(MYMAJOR, "joesDeviceFile");
+    printk(KERN_INFO "Good bye from Kernel\n");
+}
 
-static void __exit moduleStart(void){
-	/*
-	 * Unregister the register device
-	 * print something
-	 */
+static int __init moduleStart(void){
+    printk(KERN_INFO "Hello from Kernel\n");
 
-	printk("Hello from Kernel");
-	int success;
+    int success;
 
-	/*
-	 * Register device nummber
-	 */
-	success = register_chrdev(MYMAJOR, "joesDeviceFile", &fops);
+    success = register_chrdev(MYMAJOR, "joesDeviceFile", &fops);
 
-	if (success == 0){
-		printk("Device driver is register with device number Major: %d, Minor: %d\n, MYMJOR, 0");	
-	} else if (success > 0) {
- 		printk("Device driver is register with device number Major: %d, Minor: %d\n, success>>20, success&0xfffff");
-	} else {
-		printk("Could not register device");
-		return -1;
-	};
+    if (success == 0){
+        printk(KERN_INFO "Device driver is registered with device number Major: %d, Minor: %d\n", MYMAJOR, 0);    
+    } else if (success > 0) {
+        printk(KERN_INFO "Device driver is registered with device number Major: %d, Minor: %d\n", MYMAJOR, success >> 20 & 0xfffff);
+    } else {
+        printk(KERN_INFO "Could not register device\n");
+        return -1;
+    }
 
-	return 0;
-};
-
-
-
-static int __init moduleStopvo(void){
-	/*
-	 * Here is when we will initialize the device file with minor and major no
-	 * registering the dev file with major and minor numbers
-	 */
-
-	unregister_chrdev(MYMAJOR, "joesDeviceFile");
-	printk("Good bye from Kernel");
-
-
-
-};
-
-
-
-
+    return 0;
+}
 
 module_init(moduleStart);
-module.exit(moduleStop);
-
+module_exit(moduleStop);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("JONATHAN"); 
+MODULE_AUTHOR("Jonathan");
 MODULE_DESCRIPTION("Simple Device driver");
