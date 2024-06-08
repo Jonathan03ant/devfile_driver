@@ -4,6 +4,13 @@
 
 #define MYMAJOR 19
 
+/*
+ 	*@NOTE 
+ * When a user application calls open on a device file, the kernel will forward the call to this function.
+ * inode dev_file is needed for the actual driver to determine permission, check major and minor number etc
+ * the file instance is created after the device file is opned.
+ */
+
 static int devFileOpen(struct inode *deviceFile, struct file *instance){
     printk(KERN_INFO "device driver -- open was called\n");
     return 0;
@@ -26,8 +33,13 @@ static void __exit moduleStop(void){
 }
 
 static int __init moduleStart(void){
-    printk(KERN_INFO "Hello from Kernel\n");
+    
+		/*
+	 * Here is when we will initialize the device file with minor and major no
+	 * registering the dev file with major and minor numbers
+	 */
 
+    printk(KERN_INFO "Hello from Kernel\n");
     int success;
 
     success = register_chrdev(MYMAJOR, "joesDeviceFile", &fops);
