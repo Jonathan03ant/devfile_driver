@@ -1,4 +1,4 @@
-obj-m += mymodule.o
+obj-m += devicefile_dr.o
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules

@@ -14,41 +14,27 @@
  * the file instance is created after the device file is opned.
  */
 
-static struct file_operation fops = {
-	.owner = THIS_MODULE, 
-	.open = devFileOpen,
-	.release = devFileRelease
-};
 
-static int defFileOpen(struct inode *deviceFile, struct file *instance){
+static int devFileOpen(struct inode *deviceFile, struct file *instance){
 	printk("device driver -- open was called");
 	return 0;
 
 };
 
 
-static int defFileRelease (struct inode *deviceFile, struct file *instance){
+static int devFileRelease (struct inode *deviceFile, struct file *instance){
 	printk("device driver -- close was called\n");
 	return 0;
 };
 
-
-
-static int __init moduleExit(void){
-	/*
-	 * Here is when we will initialize the device file with minor and major no
-	 * registering the dev file with major and minor numbers
-	 */
-
-	unregister_chrdev(MYMAJOR, "joesDeviceFile");
-	printk("Good bye from Kernel");
-
-
-
+static struct file_operations fops = {
+        .owner = THIS_MODULE,
+        .open = devFileOpen,
+        .release = devFileRelease
 };
 
 
-static void __exit moduleInit(void){
+static void __exit moduleStart(void){
 	/*
 	 * Unregister the register device
 	 * print something
@@ -63,9 +49,9 @@ static void __exit moduleInit(void){
 	success = register_chrdev(MYMAJOR, "joesDeviceFile", &fops);
 
 	if (success == 0){
-		prtink("Device driver is register with device number Major: %d, Minor: %d\n, MYMJOR, 0");	
+		printk("Device driver is register with device number Major: %d, Minor: %d\n, MYMJOR, 0");	
 	} else if (success > 0) {
- 		prtink("Device driver is register with device number Major: %d, Minor: %d\n, success>>20, success&0xfffff");
+ 		printk("Device driver is register with device number Major: %d, Minor: %d\n, success>>20, success&0xfffff");
 	} else {
 		printk("Could not register device");
 		return -1;
@@ -76,12 +62,27 @@ static void __exit moduleInit(void){
 
 
 
+static int __init moduleStopvo(void){
+	/*
+	 * Here is when we will initialize the device file with minor and major no
+	 * registering the dev file with major and minor numbers
+	 */
+
+	unregister_chrdev(MYMAJOR, "joesDeviceFile");
+	printk("Good bye from Kernel");
 
 
-module_init(moduleInit);
-module.exit(moduleExit);
+
+};
+
+
+
+
+
+module_init(moduleStart);
+module.exit(moduleStop);
 
 
 MODULE_LICENSE("GPL");
-MODULE_ATUTHOR("JONATHAN"); 
+MODULE_AUTHOR("JONATHAN"); 
 MODULE_DESCRIPTION("Simple Device driver");
