@@ -1,4 +1,4 @@
-obj-m += devicefile_dr.o
+obj-m += IOCtl_Dev_File.o
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
