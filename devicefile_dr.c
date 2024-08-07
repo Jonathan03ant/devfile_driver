@@ -1,64 +1,148 @@
 #include <linux/module.h>
-#include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/fs.h>
+#include <linux/cdev.h>
+#include <linux/uaccess.h>
+#include <linux/semaphore.h>
 
-#define MYMAJOR 19
+#define DEVICE_NAME "utg"
+
+/* 
+    * We need the following to register a device file
+    * cdev to register our char device file
+    * a major and minor no
+    * dev_t to hold major and minor no
+*/
+
+static struct cdev *my_char_dev;
+static int major;
+static int minor = 0;
+dev_t dev_n;
 
 /*
- 	*@NOTE 
- * When a user application calls open on a device file, the kernel will forward the call to this function.
- * inode dev_file is needed for the actual driver to determine permission, check major and minor number etc
- * the file instance is created after the device file is opned.
- */
+    * struct to represent our device file
+    * this is temporary
+*/
 
-static int devFileOpen(struct inode *deviceFile, struct file *instance){
-    printk(KERN_INFO "device driver -- open was called\n");
-    return 0;
+struct my_device {
+    char data[256];
+    struct semaphore sem;
 };
 
-static int devFileRelease(struct inode *deviceFile, struct file *instance){
-    printk(KERN_INFO "device driver -- close was called\n");
-    return 0;
+struct my_device virtual_dev; 
+
+/*
+    *  This will be the file operations the Kernel calls
+    *  when the driver is called from the user space
+*/
+
+static int deviceOpen(struct inode *inode, struct file *instance);
+static int deviceRelease(struct inode *inode, struct file *instance);
+static ssize_t deviceRead(struct file *filp, char *buffer, size_t buffcnt, loff_t *off_p);
+static ssize_t deviceWrite(struct file *filp, const char *buffer, size_t buffcnt, loff_t *off_p);
+
+struct file_operations f_ops = {
+    .owner = THIS_MODULE,
+    .open = deviceOpen,
+    .release = deviceRelease,
+    .read = deviceRead,
+    .write = deviceWrite,
 };
 
-static struct file_operations fops = {
-   .owner = THIS_MODULE,
-   .open = devFileOpen,
-   .release = devFileRelease
-};
+/* 
+   * Now we can define our operations we defined above
+  
+*/
 
-static void __exit moduleStop(void){
-    unregister_chrdev(MYMAJOR, "joesDeviceFile");
-    printk(KERN_INFO "Good bye from Kernel\n");
-}
-
-static int __init moduleStart(void){
-    
-		/*
-	 * Here is when we will initialize the device file with minor and major no
-	 * registering the dev file with major and minor numbers
-	 */
-
-    printk(KERN_INFO "Hello from Kernel\n");
-    int success;
-
-    success = register_chrdev(MYMAJOR, "joesDeviceFile", &fops);
-
-    if (success == 0){
-        printk(KERN_INFO "Device driver is registered with device number Major: %d, Minor: %d\n", MYMAJOR, 0);    
-    } else if (success > 0) {
-        printk(KERN_INFO "Device driver is registered with device number Major: %d, Minor: %d\n", MYMAJOR, success >> 20 & 0xfffff);
-    } else {
-        printk(KERN_INFO "Could not register device\n");
+int deviceOpen(struct inode *inode, struct file *instance) {
+    if (down_interruptible(&virtual_dev.sem) != 0) {
+        printk(KERN_ALERT "Device running already, CANNOT be locked");
         return -1;
     }
 
+    printk(KERN_INFO "Device Open() is called");
     return 0;
 }
 
-module_init(moduleStart);
-module_exit(moduleStop);
+int deviceRelease(struct inode *inode, struct file *instance) {
+    up(&virtual_dev.sem);
+    printk(KERN_INFO "Device close() called, closing device");
+    return 0;
+}
+
+/*
+    * KERNEL---->USER
+*/
+
+ssize_t deviceRead(struct file *filp, char *buffer, size_t buffcnt, loff_t *off_p) {
+    printk(KERN_INFO "Device read() is called, reading from driver");
+    int ret = copy_to_user(buffer, virtual_dev.data, buffcnt);  // (to, from, n)
+    return ret;
+}
+
+/*
+    * USER---->KERNEL
+*/
+ssize_t deviceWrite(struct file *filp, const char *buffer, size_t buffcnt, loff_t *off_p) {
+    printk(KERN_INFO "Device write() is called, writing to driver.");
+    int ret = copy_from_user(virtual_dev.data, buffer, buffcnt); // (to, from, n)
+    return ret;
+}
+
+/* 
+    * This function will be called when we initialize the driver
+    * First we call alloc_chrdev_region() to allocate range of numbers for our device
+    * Next, we call cdev_alloc() to create a chr device structure
+    * this chrdev will have fops we defined during earlier stages
+    * Finally we call cdev_add to associate the cdev we created with the numbers we allocated earlier.
+*/
+
+static int __init driverInit(void) {
+
+    /*
+        * Allocate a major number dynamically
+        * Pointer to dev_t, minorno, count(no of minor no), const char device name
+    */
+    int ret = _
+    if (ret) {
+        printk(KERN_ALERT "Failed to allocate a Major number");
+        return ret;
+    }
+
+    major = MAJOR(dev_n);
+    minor = MINOR(dev_n);
+
+    printk(KERN_INFO "DEVICE --> %s, [Major = %d], [Minor = %d]\n", DEVICE_NAME, major, minor);
+    printk(KERN_INFO "Use mknod or modprobe to insert the device file");
+
+    /*
+    * Now we can create a chr device and associate it with the dev_n
+    */
+
+    my_char_dev = cdev_alloc();
+    my_char_dev->ops = &f_ops;
+    my_char_dev->owner = THIS_MODULE; 
+
+    ret = cdev_add(my_char_dev, dev_n, 1); /* Add device to the kernel */
+    if (ret) {
+        printk(KERN_ALERT "Unable to add cdev to the Kernel");
+        return ret;
+    }
+
+    sema_init(&virtual_dev.sem, 1);
+
+    return 0;
+}    
+
+static void __exit driverExit(void) {
+    cdev_del(my_char_dev);
+    unregister_chrdev_region(dev_n, 1);
+    printk(KERN_INFO "Unloading Kernel Module");
+}
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Jonathan");
-MODULE_DESCRIPTION("Simple Device driver");
+MODULE_DESCRIPTION("Driver for BMP280 I2C Temp/Hum Sensor Module");
+
+module_init(driverInit);
+module_exit(driverExit);
